@@ -1,3 +1,4 @@
+import type { ClientSession } from "mongoose";
 import { Conflict, NotFound } from "../../shared/utils/appErrors.ts";
 import type { IClient } from "./domain/client-interface.ts";
 import Client from "./infrastructure/client.ts";
@@ -55,8 +56,8 @@ class ClientService {
     return { clients, sizeCollection };
   };
 
-  listOne = async (id: string) => {
-    const client = await Client.findById(id);
+  listOne = async (id: string, session?: ClientSession) => {
+    const client = await Client.findById(id).session(session as ClientSession);
 
     if (!client) throw new NotFound("Cliente não encontrado.");
 
