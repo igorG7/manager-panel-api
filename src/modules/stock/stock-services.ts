@@ -2,7 +2,11 @@ import StockMovement from "./infrastructure/stock.ts";
 import Product from "../products/infrastructure/products.ts";
 import type { IStockMovement } from "./domain/stock-interface.ts";
 import { NotFound, UnprocessableEntity } from "../../shared/utils/appErrors.ts";
+import type { ClientSession } from "mongoose";
 
+import productService from "../products/product-service.ts";
+
+type TypeSaleItem = { product_id: string; quantity: number; unit_price: number };
 class StockMovementService {
   list = async (query: any) => {
     const page = Number(query.page);
@@ -46,8 +50,8 @@ class StockMovementService {
     await StockMovement.insertMany(dataArray);
   };
 
-  bulkOut = async (data: any) => {
-    const dataArray: IStockMovement[] = data.products;
+  bulkOut = async (data: any, session?: ClientSession) => {
+    const dataArray: TypeSaleItem[] = data.items;
 
     const products = await Product.find({
       _id: { $in: dataArray.map((p) => p.product_id) },
@@ -82,16 +86,19 @@ class StockMovementService {
       }
     }
 
-    await Product.bulkWrite(
-      dataArray.map((item) => ({
-        updateOne: {
-          filter: { _id: item.product_id },
-          update: { $inc: { stock_quantity: -item.quantity } },
-        },
-      })),
-    );
+    const stockMovementArray = dataArray.map((product) => {
+      return {
+        product_id: product.product_id,
+        date: new Date(),
+        quantity: product.quantity,
+        type: "out",
+        note: "Débito de estoque por abertura de venda",
+      };
+    });
 
-    await StockMovement.insertMany(dataArray);
+    await productService.updateMany(dataArray, "out", session);
+
+    await StockMovement.insertMany(stockMovementArray, { ...(session && { session }) });
   };
 
   moveOut = async (data: IStockMovement) => {
