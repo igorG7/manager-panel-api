@@ -97,6 +97,12 @@ class ProductService {
 
     return product;
   }
+
+  gatherMetrics = async () => {
+    const products = await Product.find({ stock_quantity: { $lte: 10 } });
+
+    return products;
+  };
 }
 
 export default new ProductService();
