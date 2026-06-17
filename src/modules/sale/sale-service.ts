@@ -66,6 +66,7 @@ class SaleService {
 
     const sales = await Sale.find(filter)
       .populate("client_id", "name phone address")
+      .populate("items.product_id", "name provider maker")
       .sort(order)
       .limit(limit)
       .skip(skip)
@@ -92,6 +93,78 @@ class SaleService {
 
     const sale = await Sale.findByIdAndUpdate(id, { status }, { new: true });
     return sale;
+  };
+
+  private getTotalSales = async () => {
+    const values = await Sale.aggregate([
+      {
+        $group: {
+          _id: null,
+          total_value: { $sum: "$total_value" },
+        },
+      },
+    ]);
+
+    const sales_value = values[0]?.total_value ?? 0;
+
+    return sales_value;
+  };
+
+  getTopProducts = async () => {
+    const top_products = await Sale.aggregate([
+      {
+        $unwind: {
+          path: "$items",
+        },
+      },
+      {
+        $group: {
+          _id: "$items.product_id",
+          quantity: {
+            $sum: "$items.quantity",
+          },
+        },
+      },
+      {
+        $sort: {
+          quantity: -1,
+        },
+      },
+      {
+        $lookup: {
+          from: "products",
+          localField: "_id",
+          foreignField: "_id",
+          as: "product",
+        },
+      },
+      {
+        $unwind: {
+          path: "$product",
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          quantity: 1,
+          "product.name": 1,
+        },
+      },
+    ]);
+
+    return top_products;
+  };
+
+  gatherMetrics = async () => {
+    const query = { order: "desc", limit: 5 };
+
+    const [total_sales_value, top_products, latest_sales] = await Promise.all([
+      this.getTotalSales(),
+      this.getTopProducts(),
+      this.list(query),
+    ]);
+
+    return { total_sales_value, top_products, latest_sales: latest_sales.sales };
   };
 }
 
