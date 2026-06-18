@@ -99,7 +99,9 @@ class ProductService {
   }
 
   gatherMetrics = async () => {
-    const products = await Product.find({ stock_quantity: { $lte: 10 } });
+    const products = await Product.find({ stock_quantity: { $lte: 5 } }).sort({
+      stock_quantity: 1,
+    });
 
     return products;
   };
