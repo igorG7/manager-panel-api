@@ -5,6 +5,7 @@ import { NotFound, UnprocessableEntity } from "../../shared/utils/appErrors.ts";
 import clientService from "../client/client-service.ts";
 import stockMovementService from "../stock/stock-services.ts";
 import productService from "../products/product-service.ts";
+import { stat } from "fs";
 
 class SaleService {
   create = async (data: ISale) => {
@@ -95,8 +96,27 @@ class SaleService {
     return sale;
   };
 
-  private getTotalSales = async () => {
+  private rangeDate = () => {
+    const now = new Date();
+
+    const start_date = new Date(now.getFullYear(), now.getMonth(), 1);
+    const end_date = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+    return { start_date, end_date };
+  };
+
+  private getTotalSales = async (from?: string, to?: string) => {
+    const { start_date, end_date } = this.rangeDate();
+
     const values = await Sale.aggregate([
+      {
+        $match: {
+          createdAt: {
+            $gte: new Date(from as string) ?? start_date,
+            $lte: new Date(to as string) ?? end_date,
+          },
+        },
+      },
       {
         $group: {
           _id: null,
@@ -110,8 +130,18 @@ class SaleService {
     return sales_value;
   };
 
-  getTopProducts = async () => {
+  getTopProducts = async (from?: string, to?: string) => {
+    const { start_date, end_date } = this.rangeDate();
+
     const top_products = await Sale.aggregate([
+      {
+        $match: {
+          createdAt: {
+            $gte: new Date(from as string) ?? start_date,
+            $lte: new Date(to as string) ?? end_date,
+          },
+        },
+      },
       {
         $unwind: {
           path: "$items",
@@ -155,12 +185,19 @@ class SaleService {
     return top_products;
   };
 
-  gatherMetrics = async () => {
-    const query = { order: "desc", limit: 5 };
+  gatherMetrics = async (start_date?: string, end_date?: string) => {
+    const date = this.rangeDate();
+
+    const query = {
+      order: "desc",
+      limit: 5,
+      start_date: start_date ?? date.start_date,
+      end_date: end_date ?? date.end_date,
+    };
 
     const [total_sales_value, top_products, latest_sales] = await Promise.all([
-      this.getTotalSales(),
-      this.getTopProducts(),
+      this.getTotalSales(start_date, end_date),
+      this.getTopProducts(start_date, end_date),
       this.list(query),
     ]);
 
