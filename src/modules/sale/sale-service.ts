@@ -130,7 +130,7 @@ class SaleService {
     return sales_value;
   };
 
-  getTopProducts = async (from?: string, to?: string) => {
+  private getTopProducts = async (from?: string, to?: string) => {
     const { start_date, end_date } = this.rangeDate();
 
     const top_products = await Sale.aggregate([
